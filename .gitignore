@@ -1,0 +1,41 @@
+# =========================
+# OS-generated files
+# =========================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+
+# =========================
+# Editor / IDE files
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+*.log
+
+# =========================
+# Node / tooling (future-proof)
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =========================
+# Build outputs (if added later)
+# =========================
+dist/
+build/
+.cache/
+backs/
+
+# =========================
+# Local environment files
+# =========================
+.env
+.env.*
