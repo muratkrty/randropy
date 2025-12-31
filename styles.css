@@ -139,7 +139,11 @@ main.wrap {
 .tag:hover { color: var(--text); }
 
 /* Prose */
-.prose p { margin: 1rem 0; }
+.prose p { 
+  margin: 1rem 0; 
+  text-align: justify;
+
+}
 
 .prose h2 {
   font-size: 1.35rem;
@@ -180,3 +184,14 @@ pre {
 }
 
 .site-footer a { color: inherit; }
+
+/* Banner image (only) 
+<img class="banner-img" src="banner.jpg" alt="Banner">
+*/
+.banner-img {
+  display: block;
+  width: 100%;
+  max-width: var(--max-width); /* 720px */
+  height: auto;
+  margin: 1.5rem auto;         /* center + spacing */
+}
