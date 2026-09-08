@@ -1,0 +1,904 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Write</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="site.js"></script>
+  <script src="blog.js" data-lib></script>
+  <style>
+    :root { color-scheme: light dark; }
+    html, body { height: 100%; }
+    body { display: flex; flex-direction: column; overflow: hidden; }
+
+    .site-header .wrap { width: min(100% - 3rem, 1500px); }
+    .tools { display: flex; align-items: center; gap: .75rem; }
+    .status { color: var(--muted); font-size: .9rem; }
+
+    .btn {
+      display: inline-block; text-decoration: none;
+      font: inherit; font-size: .9rem; line-height: 1.4;
+      padding: .15rem .8rem; border-radius: 999px;
+      border: 1px solid var(--rule); background: transparent; color: var(--muted);
+      cursor: pointer;
+    }
+    .btn:hover { color: var(--text); border-color: var(--muted); }
+    .btn.primary { color: var(--text); border-color: var(--text); }
+    .btn:disabled, .btn:disabled:hover { color: var(--muted); border-color: var(--rule); opacity: .45; cursor: default; }
+    .btn.on { color: var(--text); border-color: var(--text); background: rgba(127, 127, 127, .12); }
+    .btn:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--muted); outline-offset: 2px; }
+
+    /* Two panes */
+    .studio {
+      flex: 1; min-height: 0;
+      display: grid; grid-template-columns: 1fr 1fr;
+    }
+    .pane { min-height: 0; overflow-y: auto; }
+    .editor {
+      display: flex; flex-direction: column;
+      border-right: 1px solid var(--rule);
+      padding: 2.5rem clamp(1rem, 4vw, 3rem) 1rem;
+    }
+    .preview { padding: 2.5rem 0 3rem; }
+    .preview .wrap { padding: 0 1rem; }
+    .preview .placeholder { color: var(--muted); }
+
+    .editor input, .editor textarea {
+      font: inherit; color: inherit; background: transparent;
+      border: 0; border-radius: 0; padding: 0; margin: 0; width: 100%;
+    }
+    .editor input::placeholder, .editor textarea::placeholder { color: var(--muted); opacity: .7; }
+    .editor .title-input { font-size: 2.2rem; line-height: 1.15; font-weight: 700; }
+    .editor textarea:focus-visible { outline: none; }
+    .editor input[type="date"] {
+      width: auto; min-width: 9.5rem; margin: .75rem 0 1.5rem;
+      font-size: .95rem; color: var(--muted);
+    }
+
+    .body-wrap { position: relative; flex: 1; min-height: 12rem; display: flex; }
+    textarea#body { flex: 1; min-height: 12rem; resize: none; line-height: 1.75; }
+
+    /* Focus mode: the textarea text turns transparent and a synced
+       layer behind it shows the current paragraph in ink, the rest dim. */
+    #backdrop { position: absolute; inset: 0; overflow: hidden; display: none; pointer-events: none; }
+    #backdrop-text { white-space: pre-wrap; overflow-wrap: break-word; line-height: 1.75; }
+    #backdrop-text .dim { color: var(--muted); opacity: .45; }
+    #backdrop-text .lit { color: var(--text); }
+    body.focusmode #backdrop { display: block; }
+    body.focusmode textarea#body { color: transparent; caret-color: var(--text); scrollbar-width: none; }
+    body.focusmode textarea#body::-webkit-scrollbar { display: none; }
+    .editor-foot {
+      display: flex; gap: 1rem;
+      margin-top: .75rem; padding-top: .5rem; border-top: 1px solid var(--rule);
+      color: var(--muted); font-size: .85rem;
+    }
+    .fog-easy { color: #2e8b57; }
+    .fog-mid  { color: #3572d0; }
+    .fog-hard { color: #d0342c; }
+
+    body.hide-preview .studio { grid-template-columns: 1fr; }
+    body.hide-preview .preview { display: none; }
+    body.hide-preview .editor { border-right: 0; width: min(100% - 2rem, var(--max-width)); margin-inline: auto; padding-inline: 0; }
+    /* no visible scrollbar in the single-pane view; scrolling still works */
+    body.hide-preview .editor, body.hide-preview textarea#body { scrollbar-width: none; }
+    body.hide-preview .editor::-webkit-scrollbar, body.hide-preview textarea#body::-webkit-scrollbar { display: none; }
+
+    @media (max-width: 900px) {
+      .studio { grid-template-columns: 1fr; }
+      .editor { border-right: 0; padding-inline: 1rem; }
+      .preview { display: none; }
+      body.show-preview .editor { display: none; }
+      body.show-preview .preview { display: block; }
+    }
+
+    /* Room: fullscreen, nothing on screen but the writing */
+    body.room .site-header, body.room .preview, body.room .editor-foot,
+    body.room .editor input[type="date"] { display: none; }
+    body.room .studio { grid-template-columns: 1fr; }
+    body.room .editor {
+      border-right: 0; width: min(100% - 2rem, var(--max-width));
+      margin-inline: auto; padding: 9vh 0 2rem;
+    }
+    body.room .editor, body.room textarea#body { scrollbar-width: none; }
+    body.room .editor::-webkit-scrollbar, body.room textarea#body::-webkit-scrollbar { display: none; }
+    body.room .editor .title-input { margin-bottom: 1.5rem; }
+
+    /* Open dialog */
+    dialog {
+      width: min(100% - 2rem, 30rem); padding: 1.5rem 1.75rem 1.25rem;
+      color: var(--text); background: var(--bg);
+      border: 1px solid var(--rule); border-radius: 6px;
+    }
+    dialog::backdrop { background: rgba(0, 0, 0, .35); }
+    dialog h2 { font-size: 1.2rem; margin: 0 0 .75rem; line-height: 1.3; }
+    .post-list { list-style: none; margin: 0; padding: 0; max-height: 60vh; overflow-y: auto; }
+    .post-list button {
+      display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;
+      width: 100%; text-align: left; font: inherit;
+      background: none; border: 0; border-top: 1px solid var(--rule);
+      padding: .55rem .25rem; color: var(--text); cursor: pointer;
+    }
+    .post-list button:hover { background: rgba(127, 127, 127, .08); }
+    .post-list time { color: var(--muted); font-size: .85rem; white-space: nowrap; }
+    .dialog-foot { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 1rem; }
+    .pager { display: flex; align-items: center; gap: .6rem; }
+
+    .toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); padding: .35rem 1rem; border-radius: 999px; background: var(--text); color: var(--bg); font-size: .9rem; opacity: 0; transition: opacity .2s; pointer-events: none; }
+    .toast.on { opacity: 1; }
+    @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="index.html">Write</a>
+      <div class="tools">
+        <span class="status" id="status" aria-live="polite"></span>
+        <button class="btn" id="toggle" type="button">Hide preview</button>
+        <button class="btn" id="room" type="button">Room</button>
+        <button class="btn" id="focus" type="button">Focus</button>
+        <button class="btn" id="new" type="button">New</button>
+        <button class="btn" id="open" type="button">Open</button>
+        <button class="btn" id="obsidian" type="button">Obsidian</button>
+        <button class="btn" id="assets" type="button">Assets</button>
+        <button class="btn" id="download" type="button">Download</button>
+        <button class="btn" id="save-file" type="button">Save</button>
+        <button class="btn primary" id="publish" type="button">Publish</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="studio">
+    <section class="pane editor" aria-label="Editor">
+      <input class="title-input" id="title" placeholder="Title" autocomplete="off" spellcheck="true">
+      <input type="date" id="date" aria-label="Date">
+      <div class="body-wrap">
+        <div id="backdrop" aria-hidden="true"><div id="backdrop-text"></div></div>
+        <textarea id="body" placeholder="Write here." spellcheck="true"></textarea>
+      </div>
+      <div class="editor-foot">
+        <span id="count"></span>
+        <span id="fog"></span>
+      </div>
+    </section>
+
+    <section class="pane preview" id="preview" aria-label="Preview">
+      <div class="wrap">
+        <article class="post">
+          <header class="post-head">
+            <h1 id="p-title">Untitled</h1>
+            <p class="post-meta"><time id="p-date"></time></p>
+          </header>
+          <div class="prose" id="p-body"><p class="placeholder">Your post appears here as you type.</p></div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="open-dialog">
+    <h2>Open a post</h2>
+    <ul class="post-list" id="open-list"></ul>
+    <div class="dialog-foot">
+      <div class="pager" id="open-pager">
+        <button class="btn" id="open-prev" type="button" aria-label="Newer posts">←</button>
+        <span class="status" id="open-page"></span>
+        <button class="btn" id="open-next" type="button" aria-label="Older posts">→</button>
+      </div>
+      <button class="btn" id="open-cancel" type="button">Cancel</button>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <script>
+  (function () {
+    'use strict';
+    var S = window.SITE || {};
+    var KEY = 'blog.draft';
+    var $ = function (id) { return document.getElementById(id); };
+    var els = {
+      title: $('title'), date: $('date'), body: $('body'),
+      pTitle: $('p-title'), pDate: $('p-date'), pBody: $('p-body'),
+      status: $('status'), count: $('count'), fog: $('fog'), preview: $('preview'),
+      toast: $('toast'), dialog: $('open-dialog'), list: $('open-list')
+    };
+    var saveTimer, renderTimer;
+    // The name of the file this draft belongs to. Set when a post is
+    // opened, saved or published; empty for an unnamed new draft.
+    var currentFile = '';
+
+    document.title = 'Write — ' + (S.name || 'Blog');
+
+    /* ---- draft ---- */
+    function read() {
+      return { title: els.title.value, date: els.date.value, body: els.body.value, file: currentFile };
+    }
+    function stampTime(prefix) {
+      var t = new Date();
+      return prefix + ' ' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
+    }
+    function save() {
+      var d = read(); d.savedAt = Date.now();
+      try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) { /* private mode */ }
+      els.status.textContent = stampTime('Saved');
+      diskSave();
+    }
+    function restore() {
+      var d = null;
+      try { d = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { /* ignore */ }
+      if (d) {
+        els.title.value = d.title || ''; els.date.value = d.date || Blog.today();
+        els.body.value = d.body || '';
+        currentFile = d.file || '';
+        if (d.savedAt) els.status.textContent = stampTime('Saved');
+      } else {
+        els.date.value = Blog.today();
+      }
+    }
+    function changed() {
+      els.status.textContent = 'Unsaved';
+      $('publish').disabled = false;
+      clearTimeout(saveTimer); saveTimer = setTimeout(save, 400);
+      clearTimeout(renderTimer); renderTimer = setTimeout(preview, 90);
+    }
+
+    /* ---- Gunning Fog ----
+       0.4 × (words per sentence + 100 × share of 3+ syllable words),
+       computed on the prose: code, URLs and markup are stripped first. */
+    function syllables(w) {
+      w = w.toLowerCase().replace(/[^a-z]/g, '');
+      if (w.length <= 3) return 1;
+      w = w.replace(/(?:[^laeiouy]e|ed|es)$/, '');
+      var m = w.match(/[aeiouy]{1,2}/g);
+      return m ? m.length : 1;
+    }
+    function fogIndex(md) {
+      var text = String(md)
+        .replace(/```[\s\S]*?```/g, ' ')
+        .replace(/`[^`\n]*`/g, ' ')
+        .replace(/!\[([^\]]*)\]\([^)]*\)/g, ' ')
+        .replace(/\[\^[^\]]+\]:?/g, ' ')
+        .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+        .replace(/<[^<>]+>/g, ' ')
+        .replace(/https?:\/\/\S+/g, ' ')
+        .replace(/^ {0,3}#{1,6}\s+/gm, '')
+        .replace(/[*_~]+/g, '');
+      var words = text.match(/[A-Za-zÀ-ɏ][A-Za-zÀ-ɏ'’-]*/g) || [];
+      var sentences = text.split(/[.!?…]+/).filter(function (s) { return /[A-Za-zÀ-ɏ]/.test(s); }).length;
+      if (!words.length || !sentences) return null;
+      var complex = 0;
+      words.forEach(function (w) { if (w.indexOf('-') < 0 && syllables(w) >= 3) complex++; });
+      return 0.4 * (words.length / sentences + 100 * complex / words.length);
+    }
+
+    /* ---- preview ---- */
+    function preview() {
+      var d = read();
+      els.pTitle.textContent = d.title.trim() || 'Untitled';
+      els.pDate.textContent = Blog.formatDate(d.date);
+      els.pDate.setAttribute('datetime', d.date);
+      if (!d.body.trim()) {
+        els.pBody.innerHTML = '<p class="placeholder">Your post appears here as you type.</p>';
+      } else {
+        var out = Blog.render(d.body, { root: '', shift: 1 });
+        els.pBody.innerHTML = (out.html + out.footnotes).replace(/(src|href)="\.\.\//g, '$1="');
+      }
+      var n = Blog.wordCount(d.body);
+      els.count.textContent = n ? n + (n === 1 ? ' word' : ' words') + ' · ' + Math.max(1, Math.round(n / 220)) + ' min read' : '';
+      var fog = fogIndex(d.body);
+      if (fog == null) {
+        els.fog.textContent = ''; els.fog.className = '';
+      } else {
+        els.fog.textContent = 'Fog ' + fog.toFixed(1);
+        els.fog.className = fog > 16 ? 'fog-hard' : fog > 10 ? 'fog-mid' : 'fog-easy';
+      }
+      updateFocus();
+    }
+
+    /* ---- the post as a file ---- */
+    function fileName() { return currentFile || Blog.slugify(els.title.value || 'untitled'); }
+    function siteUrl() { return String(S.url || '').replace(/\/+$/, ''); }
+    function attr(s) { return Blog.esc(s); }
+
+    function postFile() {
+      var d = read(), f = fileName(), lines = [];
+      var body = d.body.replace(/^\s*\n/, '').replace(/\s+$/, '').replace(/<\/script/gi, '<\\/script');
+      lines.push('<!doctype html>');
+      lines.push('<meta charset="utf-8">');
+      lines.push('<title>' + attr(d.title.trim() || 'Untitled') + (S.name ? ' — ' + attr(S.name) : '') + '</title>');
+      lines.push('<meta property="og:title" content="' + attr(d.title.trim() || 'Untitled') + '">');
+      if (siteUrl()) {
+        lines.push('<meta property="og:url" content="' + attr(siteUrl() + '/posts/' + f) + '">');
+        lines.push('<link rel="canonical" href="' + attr(siteUrl() + '/posts/' + f) + '">');
+      }
+      lines.push('<script src="../blog.js"><\/script>');
+      lines.push('<script type="text/markdown">');
+      lines.push('');
+      lines.push(body);
+      lines.push('');
+      lines.push('<\/script>');
+      return lines.join('\n') + '\n';
+    }
+
+    function entryLine(p) {
+      var parts = [];
+      parts.push('date: ' + JSON.stringify(p.date || ''));
+      parts.push('file: ' + JSON.stringify(p.file || ''));
+      parts.push('title: ' + JSON.stringify(p.title || p.file || 'Untitled'));
+      if (p.summary) parts.push('summary: ' + JSON.stringify(p.summary));
+      if (p.image) parts.push('image: ' + JSON.stringify(p.image));
+      if (p.updated) parts.push('updated: ' + JSON.stringify(p.updated));
+      return '  { ' + parts.join(', ') + ' },';
+    }
+
+    function escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+    // Evaluate a site.js text and hand back its SITE and POSTS.
+    function parseSiteText(text) {
+      try {
+        return new Function(text +
+          '\n;return { site: (typeof SITE === "undefined" ? {} : SITE), posts: (typeof POSTS === "undefined" ? [] : POSTS) };')();
+      } catch (e) { return null; }
+    }
+
+    var toastTimer;
+    function toast(msg, ms) {
+      els.toast.textContent = msg; els.toast.classList.add('on');
+      clearTimeout(toastTimer); toastTimer = setTimeout(function () { els.toast.classList.remove('on'); }, ms || 1800);
+    }
+
+    /* ---- Download: the no-file-access fallback ---- */
+    function download(text, name, type) {
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([text], { type: type || 'text/plain' }));
+      a.download = name; document.body.appendChild(a); a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); document.body.removeChild(a); }, 0);
+    }
+    // site.js regenerated from the page-load state, with this post included.
+    function siteJsFile() {
+      var d = read();
+      var mine = { date: d.date || Blog.today(), file: fileName(), title: d.title.trim() || 'Untitled' };
+      var posts = (Array.isArray(window.POSTS) ? window.POSTS : []).filter(function (p) {
+        return p && p.file && p.file !== mine.file;
+      });
+      var settings = Object.keys(S).map(function (k) {
+        var key = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(k) ? k : JSON.stringify(k);
+        return '  ' + key + ': ' + JSON.stringify(S[k]);
+      }).join(',\n');
+      return '/* site.js — your settings and the list of posts.\n' +
+        '   Generated by write.html; edit freely, it stays valid. */\n\n' +
+        'var SITE = {\n' + settings + '\n};\n\n' +
+        '/* One line per post, newest date listed first (order does not\n' +
+        '   matter). Optional fields: summary, image, updated. */\n' +
+        'var POSTS = [\n' +
+        [mine].concat(posts).map(entryLine).join('\n') + '\n' +
+        '];\n';
+    }
+    function downloadFiles() {
+      save();
+      var f = fileName();
+      download(postFile(), f + '.html', 'text/html');
+      setTimeout(function () { download(siteJsFile(), 'site.js', 'text/javascript'); }, 300);
+      toast('Put ' + f + '.html in posts/ and replace site.js. Done.', 4000);
+    }
+    $('download').addEventListener('click', downloadFiles);
+
+    /* ---- the blog folder (Chrome/Edge) ----
+       Pick the folder once; the granted handle is remembered in
+       IndexedDB and reconnected silently on later visits. */
+    var dirHandle = null;
+
+    function idb(mode, fn) {
+      return new Promise(function (resolve) {
+        var open = indexedDB.open('blog-write', 1);
+        open.onupgradeneeded = function () { open.result.createObjectStore('kv'); };
+        open.onerror = function () { resolve(undefined); };
+        open.onsuccess = function () {
+          var rq = fn(open.result.transaction('kv', mode).objectStore('kv'));
+          rq.onsuccess = function () { resolve(rq.result); };
+          rq.onerror = function () { resolve(undefined); };
+        };
+      });
+    }
+    function rememberDir(dir) { return idb('readwrite', function (s) { return s.put(dir, 'dir'); }); }
+    function recallDir() { return idb('readonly', function (s) { return s.get('dir'); }); }
+
+    function fsSupported() { return !!window.showDirectoryPicker; }
+
+    async function blogDir() {
+      if (!fsSupported()) {
+        toast('This browser cannot write files — use Download instead', 3000);
+        return null;
+      }
+      if (dirHandle) return dirHandle;
+      var stored = await recallDir();
+      if (stored) {
+        try {
+          var p = await stored.queryPermission({ mode: 'readwrite' });
+          if (p !== 'granted') p = await stored.requestPermission({ mode: 'readwrite' });
+          if (p === 'granted') { await stored.getFileHandle('site.js'); dirHandle = stored; return stored; }
+        } catch (e) { /* folder gone or permission refused — ask again below */ }
+      }
+      toast('Choose your blog folder — one time only', 3000);
+      var dir = await window.showDirectoryPicker({ id: 'blog', mode: 'readwrite' });
+      try { await dir.getFileHandle('site.js'); }
+      catch (e) { toast('That folder has no site.js — pick the blog folder', 3000); return null; }
+      dirHandle = dir;
+      rememberDir(dir);
+      return dir;
+    }
+
+    async function writeFile(dir, name, data) {
+      var fh = await dir.getFileHandle(name, { create: true });
+      var w = await fh.createWritable();   // replaces the old contents
+      await w.write(data); await w.close();
+    }
+    async function readText(dir, name) {
+      var fh = await dir.getFileHandle(name);
+      return await (await fh.getFile()).text();
+    }
+
+    // Reconnect a previously granted folder without any dialog.
+    (function reconnect() {
+      if (!fsSupported()) return;
+      recallDir().then(async function (stored) {
+        if (!stored) return;
+        try {
+          if ((await stored.queryPermission({ mode: 'readwrite' })) !== 'granted') return;
+          await stored.getFileHandle('site.js');
+          dirHandle = stored;
+        } catch (e) { /* ignore */ }
+      });
+    })();
+
+    /* ---- continuous save to disk ----
+       Once the folder is connected, the draft is written to posts/ as
+       you type. An unnamed draft lives at posts/_draft.html, which is
+       not listed in site.js and therefore invisible on the site. */
+    var diskBusy = false, diskPending = false;
+    function diskName() { return (currentFile || '_draft') + '.html'; }
+    async function diskSave() {
+      if (!dirHandle) return;
+      var d = read();
+      if (!d.title.trim() && !d.body.trim()) return;
+      if (diskBusy) { diskPending = true; return; }
+      diskBusy = true;
+      try {
+        var posts = await dirHandle.getDirectoryHandle('posts', { create: true });
+        await writeFile(posts, diskName(), postFile());
+        els.status.textContent = stampTime('Saved posts/' + diskName() + ' ·');
+      } catch (e) { /* keep writing locally; Save reports errors */ }
+      diskBusy = false;
+      if (diskPending) { diskPending = false; diskSave(); }
+    }
+
+    /* ---- Save: write the post file under its real name ---- */
+    async function saveToFolder() {
+      clearTimeout(saveTimer);
+      try {
+        var dir = await blogDir(); if (!dir) return;
+        if (!currentFile) currentFile = Blog.slugify(els.title.value || 'untitled');
+        var posts = await dir.getDirectoryHandle('posts', { create: true });
+        await writeFile(posts, currentFile + '.html', postFile());
+        save();
+        toast('Saved posts/' + currentFile + '.html');
+      } catch (e) {
+        if (e && e.name !== 'AbortError') toast('Could not save: ' + (e.message || e), 3000);
+      }
+    }
+
+    /* ---- Publish: Save + list it in site.js, one click ----
+       A new post gets its line added; a post that is already listed
+       keeps its place, gets its title refreshed, and — when its date
+       is in the past — is stamped updated: today. */
+    async function publishPost() {
+      clearTimeout(saveTimer);
+      try {
+        var dir = await blogDir(); if (!dir) return;
+        if (!currentFile) currentFile = Blog.slugify(els.title.value || 'untitled');
+        var posts = await dir.getDirectoryHandle('posts', { create: true });
+        await writeFile(posts, currentFile + '.html', postFile());
+
+        var text = await readText(dir, 'site.js');
+        var parsed = parseSiteText(text);
+        if (!parsed) { toast('site.js has an error — fix it, then publish again', 3500); return; }
+        var d = read(), t = Blog.today();
+        var title = d.title.trim() || 'Untitled';
+        var existing = null;
+        parsed.posts.forEach(function (p) { if (p && p.file === currentFile) existing = p; });
+
+        var msg;
+        if (existing) {
+          var date = d.date || existing.date;
+          var upd = {
+            date: date, file: currentFile, title: title,
+            summary: existing.summary, image: existing.image,
+            updated: (date && date < t) ? t : existing.updated
+          };
+          var lineRe = new RegExp('^[^\\n]*file:\\s*["\']' + escRe(currentFile) + '["\'][^\\n]*$', 'm');
+          var newText = text.replace(lineRe, entryLine(upd));
+          if (newText === text) { toast('Could not find the post’s line in site.js', 3500); return; }
+          await writeFile(dir, 'site.js', newText);
+          msg = upd.updated === t ? 'stamped updated ' + Blog.formatDate(t) : 'entry refreshed';
+        } else {
+          var line = entryLine({ date: d.date || t, file: currentFile, title: title });
+          var added = text.replace(/var POSTS\s*=\s*\[/, function (m) { return m + '\n' + line; });
+          if (added === text) { toast('Could not find POSTS in site.js', 3500); return; }
+          await writeFile(dir, 'site.js', added);
+          msg = 'added to site.js';
+        }
+        $('publish').disabled = true;
+        save();
+        toast('Published ' + currentFile + ' — ' + msg, 3500);
+      } catch (e) {
+        if (e && e.name !== 'AbortError') toast('Could not publish: ' + (e.message || e), 3500);
+      }
+    }
+
+    /* ---- Open: load a published post back into the editor ----
+       Five posts a page, newest first. */
+    var OPEN_PAGE = 5;
+    var openList = [], openPage = 0;
+
+    function renderOpenList() {
+      var pages = Math.max(1, Math.ceil(openList.length / OPEN_PAGE));
+      if (openPage > pages - 1) openPage = pages - 1;
+      if (openPage < 0) openPage = 0;
+      els.list.innerHTML = '';
+      openList.slice(openPage * OPEN_PAGE, (openPage + 1) * OPEN_PAGE).forEach(function (p) {
+        var li = document.createElement('li');
+        var b = document.createElement('button');
+        b.type = 'button';
+        var name = document.createElement('span');
+        name.textContent = p.title || p.file;
+        var when = document.createElement('time');
+        when.textContent = Blog.formatDate(p.date);
+        b.appendChild(name); b.appendChild(when);
+        b.addEventListener('click', function () { loadPost(p); });
+        li.appendChild(b); els.list.appendChild(li);
+      });
+      $('open-pager').hidden = pages < 2;
+      $('open-prev').disabled = openPage === 0;
+      $('open-next').disabled = openPage === pages - 1;
+      $('open-page').textContent = (openPage + 1) + ' / ' + pages;
+    }
+    $('open-prev').addEventListener('click', function () { openPage--; renderOpenList(); });
+    $('open-next').addEventListener('click', function () { openPage++; renderOpenList(); });
+
+    async function openPost() {
+      try {
+        var dir = await blogDir(); if (!dir) return;
+        var parsed = parseSiteText(await readText(dir, 'site.js'));
+        if (!parsed) { toast('site.js has an error — fix it first', 3500); return; }
+        openList = parsed.posts.filter(function (p) { return p && p.file; })
+          .sort(function (a, b) { return String(b.date || '').localeCompare(String(a.date || '')); });
+        if (!openList.length) { toast('No posts in site.js yet'); return; }
+        openPage = 0;
+        renderOpenList();
+        els.dialog.showModal();
+      } catch (e) {
+        if (e && e.name !== 'AbortError') toast('Could not open: ' + (e.message || e), 3500);
+      }
+    }
+
+    async function loadPost(p) {
+      var mine = read();
+      if (mine.body.trim() && p.file !== currentFile &&
+          !confirm('Open “' + (p.title || p.file) + '”? The current draft will be replaced.')) return;
+      els.dialog.close();
+      try {
+        var posts = await dirHandle.getDirectoryHandle('posts');
+        var html = await readText(posts, p.file + '.html');
+        var m = /<script type="text\/markdown">\n?([\s\S]*?)<\/script>/.exec(html);
+        if (!m) { toast(p.file + '.html has no markdown block', 3500); return; }
+        els.title.value = p.title || p.file;
+        els.date.value = p.date || Blog.today();
+        els.body.value = m[1].replace(/^\s*\n/, '').replace(/\s+$/, '').replace(/<\\\/script/gi, '</script');
+        currentFile = p.file;
+        $('publish').disabled = false;
+        save(); preview(); els.body.focus();
+        toast('Opened ' + p.file);
+      } catch (e) {
+        toast('Could not read posts/' + p.file + '.html', 3500);
+      }
+    }
+
+    $('open').addEventListener('click', openPost);
+    $('open-cancel').addEventListener('click', function () { els.dialog.close(); });
+
+    /* ---- Obsidian: import a note as a draft ----
+       Reads any markdown file. Frontmatter is stripped (its title: and
+       date: are used when present), a leading # heading becomes the
+       title, and [[wikilinks]] flatten to their text. */
+    function fromObsidian(md, fallbackName) {
+      md = String(md).replace(/\r\n?/g, '\n');
+      var title = '', date = '';
+      var fm = /^---\n([\s\S]*?)\n---\n?/.exec(md);
+      if (fm) {
+        md = md.slice(fm[0].length);
+        var tm = /^title:\s*["']?(.+?)["']?\s*$/m.exec(fm[1]); if (tm) title = tm[1];
+        var dm = /^date:\s*["']?(\d{4}-\d{2}-\d{2})/m.exec(fm[1]); if (dm) date = dm[1];
+      }
+      md = md.replace(/^\s+/, '');
+      if (!title) {
+        var h1 = /^ {0,3}#\s+(.+?)\s*$/.exec(md.split('\n')[0] || '');
+        if (h1) { title = h1[1]; md = md.replace(/^ {0,3}#\s+[^\n]*\n*/, ''); }
+      }
+      if (!title) title = String(fallbackName || '').replace(/\.(md|markdown|txt)$/i, '');
+      md = md.replace(/!?\[\[([^\]|]+)\|([^\]]+)\]\]/g, '$2')
+             .replace(/!?\[\[([^\]]+)\]\]/g, '$1');
+      return { title: title, date: date, body: md.replace(/\s+$/, '') };
+    }
+
+    function loadImported(name, text) {
+      if (els.body.value.trim() && !confirm('Import “' + name + '”? The current draft will be replaced.')) return;
+      var note = fromObsidian(text, name);
+      els.title.value = note.title;
+      els.date.value = note.date || Blog.today();
+      els.body.value = note.body;
+      currentFile = '';
+      $('publish').disabled = false;
+      save(); preview(); els.body.focus();
+      toast('Imported ' + name);
+    }
+
+    async function importNote() {
+      if (window.showOpenFilePicker) {
+        try {
+          var picks = await window.showOpenFilePicker({
+            id: 'obsidian',   // the picker reopens in your vault next time
+            types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md', '.markdown'], 'text/plain': ['.txt'] } }]
+          });
+          var file = await picks[0].getFile();
+          loadImported(file.name, await file.text());
+        } catch (e) {
+          if (e && e.name !== 'AbortError') toast('Could not import: ' + (e.message || e), 3500);
+        }
+        return;
+      }
+      // Fallback picker: reading files works in every browser.
+      var input = document.createElement('input');
+      input.type = 'file'; input.accept = '.md,.markdown,.txt';
+      input.addEventListener('change', function () {
+        var f = input.files && input.files[0];
+        if (!f) return;
+        var r = new FileReader();
+        r.onload = function () { loadImported(f.name, r.result); };
+        r.readAsText(f);
+      });
+      input.click();
+    }
+    $('obsidian').addEventListener('click', importNote);
+
+    /* ---- Assets: explicit upload ---- */
+    async function uploadAssets() {
+      if (!fsSupported() || !window.showOpenFilePicker) {
+        toast('This browser cannot write files — copy them into assets/ by hand', 3500);
+        return;
+      }
+      try {
+        var dir = await blogDir(); if (!dir) return;
+        var picks;
+        try { picks = await window.showOpenFilePicker({ multiple: true }); }
+        catch (e) {
+          if (e && e.name === 'AbortError') return;
+          // Granting the folder used up this click; the next one goes
+          // straight to the file picker.
+          if (e && e.name === 'SecurityError') { toast('Blog folder connected — click Assets again to choose the files', 3500); return; }
+          throw e;
+        }
+        var assets = await dir.getDirectoryHandle('assets', { create: true });
+        var names = [];
+        for (var i = 0; i < picks.length; i++) {
+          var file = await picks[i].getFile();
+          await writeFile(assets, file.name, file);
+          names.push(file.name);
+        }
+        toast(names.length === 1 ? 'assets/' + names[0] + ' uploaded' : names.length + ' files uploaded to assets/', 3500);
+      } catch (e) {
+        if (e && e.name !== 'AbortError') toast('Could not upload: ' + (e.message || e), 3500);
+      }
+    }
+    $('assets').addEventListener('click', uploadAssets);
+
+    /* ---- paste or drop files into the text ----
+       Images land in assets/ and the figure markdown appears at the
+       cursor; other files become a link. */
+    function extFor(type) {
+      return { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif',
+               'image/webp': 'webp', 'image/svg+xml': 'svg' }[type] || 'png';
+    }
+    function assetName(file, pasted) {
+      if (!pasted && file.name && file.name !== 'image.png') {
+        return file.name.toLowerCase().replace(/[^a-z0-9._-]+/g, '-');
+      }
+      var d = new Date();
+      function z(n) { return String(n).padStart(2, '0'); }
+      return 'img-' + d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) +
+        '-' + z(d.getHours()) + z(d.getMinutes()) + z(d.getSeconds()) + '.' + extFor(file.type);
+    }
+    function insertAtCursor(text) {
+      var ta = els.body;
+      ta.setRangeText(text, ta.selectionStart, ta.selectionEnd, 'end');
+      changed();
+    }
+    async function takeFiles(files, pasted) {
+      if (!fsSupported()) { toast('This browser cannot write files — use Download and assets/ by hand', 3500); return; }
+      try {
+        var dir = await blogDir(); if (!dir) return;
+        var assets = await dir.getDirectoryHandle('assets', { create: true });
+        for (var i = 0; i < files.length; i++) {
+          var name = assetName(files[i], pasted);
+          await writeFile(assets, name, files[i]);
+          insertAtCursor(files[i].type.indexOf('image/') === 0
+            ? '\n![](assets/' + name + ')\n'
+            : '[' + name + '](assets/' + name + ')');
+        }
+        toast(files.length === 1 ? 'assets/' + assetName(files[0], pasted) + ' added' : files.length + ' files added to assets/', 3000);
+      } catch (e) {
+        if (e && e.name !== 'AbortError') toast('Could not add files: ' + (e.message || e), 3500);
+      }
+    }
+    els.body.addEventListener('paste', function (ev) {
+      var items = (ev.clipboardData || {}).items || [];
+      var files = [];
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].kind === 'file') { var f = items[i].getAsFile(); if (f) files.push(f); }
+      }
+      if (!files.length) return;   // plain text pastes as usual
+      ev.preventDefault();
+      takeFiles(files, true);
+    });
+    els.body.addEventListener('dragover', function (ev) { ev.preventDefault(); });
+    els.body.addEventListener('drop', function (ev) {
+      var files = Array.prototype.slice.call((ev.dataTransfer || {}).files || []);
+      if (!files.length) return;
+      ev.preventDefault();
+      takeFiles(files, false);
+    });
+
+    $('save-file').addEventListener('click', saveToFolder);
+    $('publish').addEventListener('click', publishPost);
+
+    $('new').addEventListener('click', function () {
+      if (els.body.value.trim() && !confirm('Start a new post? The current draft will be cleared.')) return;
+      els.title.value = ''; els.body.value = '';
+      els.date.value = Blog.today();
+      currentFile = '';
+      $('publish').disabled = false;
+      save(); preview(); els.title.focus();
+    });
+
+    /* ---- editing helpers ---- */
+    function wrapSelection(before, after, placeholder) {
+      var ta = els.body, s = ta.selectionStart, e = ta.selectionEnd;
+      var sel = ta.value.slice(s, e) || placeholder;
+      ta.setRangeText(before + sel + after, s, e, 'select');
+      ta.setSelectionRange(s + before.length, s + before.length + sel.length);
+      changed();
+    }
+    els.body.addEventListener('keydown', function (ev) {
+      var k = ev.key.toLowerCase();
+      if ((ev.metaKey || ev.ctrlKey) && !ev.altKey) {
+        if (k === 'b') { ev.preventDefault(); wrapSelection('**', '**', 'bold'); return; }
+        if (k === 'i') { ev.preventDefault(); wrapSelection('*', '*', 'italic'); return; }
+        if (k === 'k') { ev.preventDefault(); wrapSelection('[', '](https://)', 'link text'); return; }
+      }
+      // Enter inside a list continues the list; Enter on an empty item ends it.
+      if (ev.key === 'Enter' && !ev.shiftKey && !ev.metaKey && !ev.ctrlKey) {
+        var ta = els.body, pos = ta.selectionStart;
+        if (pos !== ta.selectionEnd) return;
+        var lineStart = ta.value.lastIndexOf('\n', pos - 1) + 1;
+        var line = ta.value.slice(lineStart, pos);
+        var m = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/.exec(line);
+        if (!m) return;
+        ev.preventDefault();
+        if (!m[3].trim()) { ta.setRangeText('', lineStart, pos, 'end'); changed(); return; }
+        var marker = /\d/.test(m[2]) ? (parseInt(m[2], 10) + 1) + m[2].slice(-1) : m[2];
+        ta.setRangeText('\n' + m[1] + marker + ' ', pos, pos, 'end');
+        changed();
+      }
+    });
+    // Ctrl/Cmd+S saves to the blog folder; Download is its fallback.
+    document.addEventListener('keydown', function (ev) {
+      if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 's') {
+        ev.preventDefault();
+        if (fsSupported()) saveToFolder(); else downloadFiles();
+      }
+    });
+
+    // Follow the writing position in the preview; keep the focus layer aligned.
+    els.body.addEventListener('scroll', function () {
+      var ta = els.body;
+      if (document.body.classList.contains('focusmode')) {
+        $('backdrop-text').style.transform = 'translateY(' + (-ta.scrollTop) + 'px)';
+      }
+      var max = ta.scrollHeight - ta.clientHeight;
+      if (max <= 0) return;
+      var p = els.preview; p.scrollTop = (ta.scrollTop / max) * (p.scrollHeight - p.clientHeight);
+    });
+
+    /* ---- Focus: light the paragraph the caret is in, dim the rest ---- */
+    function paraRange(text, pos) {
+      var re = /\n[ \t]*\n/g, start = 0, end = text.length, m;
+      while ((m = re.exec(text))) {
+        if (m.index + m[0].length <= pos) start = m.index + m[0].length;
+        else { end = Math.max(m.index, start); break; }
+      }
+      return [start, end];
+    }
+    function updateFocus() {
+      if (!document.body.classList.contains('focusmode')) return;
+      var text = els.body.value, r = paraRange(text, els.body.selectionEnd);
+      var bt = $('backdrop-text');
+      bt.textContent = '';
+      [[0, r[0], 'dim'], [r[0], r[1], 'lit'], [r[1], text.length, 'dim']].forEach(function (s) {
+        if (s[1] <= s[0]) return;
+        var el = document.createElement('span');
+        el.className = s[2];
+        el.textContent = text.slice(s[0], s[1]);
+        bt.appendChild(el);
+      });
+      bt.style.transform = 'translateY(' + (-els.body.scrollTop) + 'px)';
+    }
+    els.body.addEventListener('input', updateFocus);
+    document.addEventListener('selectionchange', function () {
+      if (document.activeElement === els.body) updateFocus();
+    });
+
+    /* the two toggles, remembered across visits */
+    function bindMode(btnId, cls, key, apply) {
+      var b = $(btnId);
+      function set(on) {
+        document.body.classList.toggle(cls, on);
+        b.classList.toggle('on', on);
+        try { localStorage.setItem(key, on ? '1' : '0'); } catch (e) { /* ignore */ }
+        apply();
+      }
+      b.addEventListener('click', function () { set(!document.body.classList.contains(cls)); els.body.focus(); });
+      var saved = null;
+      try { saved = localStorage.getItem(key); } catch (e) { /* ignore */ }
+      if (saved === '1') set(true);
+    }
+
+    /* ---- Room: fullscreen, distraction-free ---- */
+    async function enterRoom() {
+      try { await document.documentElement.requestFullscreen(); } catch (e) { /* room works without it */ }
+      document.body.classList.add('room');
+      els.body.focus();
+      toast('Room — press Esc to leave', 2500);
+    }
+    function leaveRoom() { document.body.classList.remove('room'); }
+    $('room').addEventListener('click', enterRoom);
+    document.addEventListener('fullscreenchange', function () {
+      if (!document.fullscreenElement) leaveRoom();
+    });
+    document.addEventListener('keydown', function (ev) {
+      // Esc also leaves the room when fullscreen was unavailable.
+      if (ev.key === 'Escape' && document.body.classList.contains('room') && !document.fullscreenElement) leaveRoom();
+    });
+
+    /* ---- preview toggle ---- */
+    var narrow = window.matchMedia('(max-width: 900px)');
+    function toggleLabel() {
+      var b = $('toggle');
+      if (narrow.matches) b.textContent = document.body.classList.contains('show-preview') ? 'Write' : 'Preview';
+      else b.textContent = document.body.classList.contains('hide-preview') ? 'Show preview' : 'Hide preview';
+    }
+    $('toggle').addEventListener('click', function () {
+      document.body.classList.toggle(narrow.matches ? 'show-preview' : 'hide-preview');
+      toggleLabel();
+    });
+    narrow.addEventListener('change', toggleLabel);
+
+    ['title', 'date', 'body'].forEach(function (id) { els[id].addEventListener('input', changed); });
+
+    restore(); preview(); toggleLabel();
+    bindMode('focus', 'focusmode', 'blog.focus', updateFocus);
+    (els.title.value ? els.body : els.title).focus();
+  })();
+  </script>
+</body>
+</html>
