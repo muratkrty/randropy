@@ -29,12 +29,6 @@ var SITE = {
      updated  (optional) "YYYY-MM-DD" if you revised the post
 */
 var POSTS = [
-  { date: "2026-09-06", file: "how-this-blog-works", title: "How this blog works", summary: "A blog made of plain files: no build step, no database, one HTML page as the editor, and a publish button that writes straight to disk." },
-  { date: "2026-09-06", file: "2-ros2-client-tools", title: "2. ROS2 -Client tools" },
-  { date: "2026-09-06", file: "logs-from-reviewed-papers", title: "Logs from reviewed papers" },
-  { date: "2026-09-06", file: "new-2", title: "new 2" },
-  { date: "2026-09-06", file: "live-by-design-not-by-default", title: "live by design not by default" },
-  { date: "2026-09-05", file: "there-is-no-why", title: "There is no why"},
-  { date: "2026-09-05", file: "how-to-write-here", title: "How to write here"},
+
   
 ];
